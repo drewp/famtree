@@ -1,0 +1,167 @@
+#!/usr/bin/python
+
+"""
+ontology at http://www.daml.org/2001/01/gedcom/gedcom
+
+some code from http://www.lesandchris.com/ged2www/g2w_faq.php
+
+ged description in GEDSIMPL.ZIP (search simtel)
+
+some ged-creation info at http://www.tedpack.org/text2ged.html
+
+vb ged2xml: http://www.topxml.com/downloads/default.asp?id=ged2xml
+
+http://homepage.ntlworld.com/michael.h.kay/gedml/ has java software,
+   which i somewhat port here
+
+easy indenting:
+  perl -pe 's/^(\d+) //; $_="   "x$1.$_' filename.ged
+
+"""
+
+import sys
+from rdflib import Graph, Namespace, RDFS, Literal, URIRef
+
+GEDCOM = Namespace("http://www.daml.org/2001/01/gedcom/gedcom#")
+
+takeRefArg = [ "INDI", "FAM", "OBJE", "NOTE", "REPO", "SOUR", "SUBN",
+               "SUBM", ]
+
+tokenSynonyms = [
+    ("BIRT","BIRTH"), 
+    ("CHIL","CHILD"),
+    ("DEAT","DEATH"),
+    ("FAMC","FAMILY_CHILD"),
+    ("FAMS","FAMILY_SPOUSE"),
+    ("HUSB","HUSBAND"),
+    ("LVG" ,"LIVING"),
+    ("MARR","MARRIAGE"),
+    ("PLAC","PLACE"),
+    ("TITL","TITLE"),
+    ]
+
+class Ref(str):
+    def __repr__(self):
+        return "<ref "+self+">"
+
+def parseRef(word):
+    if word.startswith("@") and word.endswith("@"):
+        return Ref(word[1:-1])
+    raise ValueError("bad xref_id")
+
+class GEDParse:
+    def __init__(self, gedfile):
+        stack = []
+        prevLevel = 0
+        possibleBoolProperties = []
+        for line in gedfile:
+            print "%-50s" % line.rstrip(),
+            try:
+                words = line.split()
+                level = int(words[0])
+
+                for i in [1,2]:
+                    try:
+                        words[i] = parseRef(words[i])
+                    except (IndexError, ValueError):
+                        pass
+                tag = words[1]
+
+                level = int(level)
+                if (level, tag) == (0, "TRLR"):
+                    break
+
+                if level < len(stack):
+                    for bp in possibleBoolProperties:
+                        self.refProperty(bp[0], bp[1], None)
+                        print "%-50s" % "",
+                possibleBoolProperties = []
+                
+                stack = stack[:level]
+                stack.append(tag)
+
+                if isinstance(words[1], Ref):
+                    tagType = words[2]
+                    self.newRef(words[1], tagType)
+                    continue
+
+                if len(words) > 2 and isinstance(words[2], Ref):
+                    self.relation(stack[0], tag, words[2])
+                    continue
+
+                if len(words) > 2:
+                    _, _, rest = line.rstrip().split(None, 2)
+                else:
+                    rest = None
+
+                if (stack[-1] == "DATE" and
+                    rest is not None and rest.startswith("ABT ")):
+                    rest = ("about", rest[4:])
+
+                if stack[0] == "HEAD":
+                    if len(stack) == 1 and rest is None:
+                        continue
+                    if len(stack) == 2:
+                        self.headerInfo(stack[1], rest)
+                        continue
+
+                if isinstance(stack[0], Ref):
+                    if rest is not None:
+                        self.refProperty(stack[0], stack[1:], rest)
+                        continue
+                    else:
+                        possibleBoolProperties.append((stack[0], stack[1:]))
+                        print
+                        continue
+                    
+                raise ValueError("no handler for %r" % ((stack, rest),))
+                prevLevel = level
+            except (ValueError, TypeError), e:
+                print "Line failed: %s" % line
+                raise
+
+    def headerInfo(self, key, val):
+        print "headerInfo", key, val
+
+    def newRef(self, ref, refType):
+        print "newRef", ref, refType
+
+    def refProperty(self, ref, key, val):
+        print "refProperty", ref, key, val
+
+    def relation(self, ref1, relation, ref2):
+        print "relation", ref1, relation, ref2
+
+class RDFOut(GEDParse):
+    def __init__(self, *args):
+        self.graph = Graph()
+        GEDParse.__init__(self, *args)
+
+    def uriFromRef(self, ref):
+        return "http://example.org/#%s" % ref
+        
+    def headerInfo(self, key, val):
+        pass
+
+    def newRef(self, ref, refType):
+        cls = {"INDI" : GEDCOM["Individual"],
+               "FAM" : GEDCOM["Family"],
+               }[refType]
+        self.graph.add((self.uriFromRef(ref), RDFS.Class, cls))
+
+
+    def refProperty(self, ref, key, val):
+        self.graph.add((self.uriFromRef(ref),
+                        GEDCOM["".join(key)],
+                        Literal(val)))
+
+    def relation(self, ref1, relation, ref2):
+        self.graph.add((self.uriFromRef(ref1),
+                        GEDCOM[relation],
+                        self.uriFromRef(ref2)))
+
+
+p = RDFOut(open(sys.argv[1]))
+print 
+
+print p.graph.serialize(open("fam.rdf", "w"), format="xml")
