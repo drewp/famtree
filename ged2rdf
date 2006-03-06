@@ -20,7 +20,7 @@ easy indenting:
 """
 
 import sys
-from rdflib import Graph, Namespace, RDFS, Literal, URIRef
+from rdflib import Graph, Namespace, RDFS, Literal, URIRef, BNode
 
 GEDCOM = Namespace("http://www.daml.org/2001/01/gedcom/gedcom#")
 
@@ -135,10 +135,13 @@ class GEDParse:
 class RDFOut(GEDParse):
     def __init__(self, *args):
         self.graph = Graph()
+        self.bnodeForRef = {}
         GEDParse.__init__(self, *args)
 
     def uriFromRef(self, ref):
-        return "http://example.org/#%s" % ref
+        if ref not in self.bnodeForRef:
+            self.bnodeForRef[ref] = BNode()
+        return self.bnodeForRef[ref]
         
     def headerInfo(self, key, val):
         pass
@@ -160,8 +163,10 @@ class RDFOut(GEDParse):
                         GEDCOM[relation],
                         self.uriFromRef(ref2)))
 
-
 p = RDFOut(open(sys.argv[1]))
 print 
 
-print p.graph.serialize(open("fam.rdf", "w"), format="xml")
+open("fam.nt", "w").write(
+    p.graph.serialize(None, format="nt").
+    replace('"Buddy"', r'\"Buddy\"') # rdflib misquotes
+    )

@@ -1,0 +1,48 @@
+#!/usr/bin/python
+
+import sys, difflib
+from rdflib import Graph, Namespace, RDFS, Literal, URIRef, BNode
+
+GEDCOM = Namespace("http://www.daml.org/2001/01/gedcom/gedcom#")
+FAMTREE = Namespace("http://bigasterisk.com/2006/03/famtree#")
+
+def relations(graph, uri):
+    sp = [(s,p,None) for s,p,o in graph.triples((None, None, uri))]
+    po = [(None, p, o) for s,p,o in graph.triples((uri, None, None))]
+    return sorted(sp + po)
+
+graph = Graph()
+graph.load("fam.rdf", format="xml")
+
+results = Graph()
+
+names = []
+for indi, _, name in graph.triples((None, GEDCOM["NAME"], None)):
+    names.append((name, indi))
+    
+print "found %s names" % len(names)
+for i, (name, uri) in enumerate(names):
+    if name in ["/child/", "/Unknown/", "/unknown/", "/Daughter/",
+                "Name /unknown/"]:
+        continue
+    for otherName, otherUri in names[i+1:]:
+        if otherName == name:
+            if uri == otherUri:
+                continue
+            #print "%s and %s have the same name %s" % (uri, otherUri, name)
+#            for u in [uri, otherUri]:
+#                print "  about %s:\n%s" % (u, "\n".join(map(str,
+#                                                     relations(graph, u))))
+        else:
+
+            # this isn't catching "Catherine Marie-France /Dupourque/"
+            # and "Catherine /Dupourque/"
+            
+            diff = difflib.SequenceMatcher(a=name, b=otherName)
+            if diff.ratio() > .90:
+                s = BNode()
+                results.add((s, FAMTREE["closeSpelling"], name))
+                results.add((s, FAMTREE["closeSpelling"], otherName))
+
+results.serialize("dup.n3", format="nt")
+                

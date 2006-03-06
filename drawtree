@@ -1,0 +1,31 @@
+#!/usr/bin/python
+
+import sys
+from rdflib import Graph, Namespace, RDFS, Literal, URIRef
+
+GEDCOM = Namespace("http://www.daml.org/2001/01/gedcom/gedcom#")
+
+graph = Graph()
+graph.load("fam.rdf", format="xml")
+print "graph has", len(graph)
+
+import yapgvb
+g = yapgvb.Digraph("famtree")
+
+node = {}
+for indi in graph.subjects(RDFS.Class, GEDCOM["Individual"]):
+    n = g.add_node(str(graph.value(indi, GEDCOM["NAME"])))
+    node[indi] = n
+
+for fam in graph.subjects(RDFS.Class, GEDCOM["Family"]):
+    pars = list(graph.objects(fam, GEDCOM["HUSB"])) + list(graph.objects(fam, GEDCOM["WIFE"]))
+    for chi in graph.objects(fam, GEDCOM["CHIL"]):
+        for par in pars:
+            try:
+                node[par] >> node[chi]
+            except KeyError, e:
+                print "node not found", e
+    
+
+g.layout(yapgvb.engines.dot)
+g.render("pic.svg")
