@@ -35,8 +35,8 @@ for i, (name, uri) in enumerate(names):
 #                                                     relations(graph, u))))
         else:
 
-            # this isn't catching "Catherine Marie-France /Dupourque/"
-            # and "Catherine /Dupourque/"
+            # this isn't catching "C M-F /D/"
+            # and "C /D/"
             
             diff = difflib.SequenceMatcher(a=name, b=otherName)
             if diff.ratio() > .90:

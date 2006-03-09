@@ -20,7 +20,7 @@ easy indenting:
 """
 
 import sys
-from rdflib import Graph, Namespace, RDFS, Literal, URIRef, BNode
+from rdflib import Graph, Namespace, RDF, RDFS, Literal, URIRef, BNode
 
 GEDCOM = Namespace("http://www.daml.org/2001/01/gedcom/gedcom#")
 
@@ -117,7 +117,7 @@ class GEDParse:
                 raise ValueError("no handler for %r" % ((stack, rest),))
                 prevLevel = level
             except (ValueError, TypeError), e:
-                print "Line failed: %s" % line
+                print "Line failed: %s" % line 
                 raise
 
     def headerInfo(self, key, val):
@@ -154,11 +154,21 @@ class RDFOut(GEDParse):
 
 
     def refProperty(self, ref, key, val):
+        prop = {
+            'NAME' : GEDCOM['name'],
+            'SEX' : GEDCOM['sex'],
+#            '' : GEDCOM[''],
+            }.get(key[0], GEDCOM["".join(key)])
+        if val is None:
+            val = RDF.nil
+        else:
+            val = Literal(val)
         self.graph.add((self.uriFromRef(ref),
-                        GEDCOM["".join(key)],
-                        Literal(val)))
+                        prop,
+                        val))
 
     def relation(self, ref1, relation, ref2):
+        return
         self.graph.add((self.uriFromRef(ref1),
                         GEDCOM[relation],
                         self.uriFromRef(ref2)))

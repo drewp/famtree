@@ -1,0 +1,44 @@
+@prefix : <http://www.daml.org/2001/01/gedcom/gedcom#> .
+@prefix famtree: <http://bigasterisk.com/2006/03/famtree#> .
+@prefix log: <http://www.w3.org/2000/10/swap/log#>.
+@prefix string:  <http://www.w3.org/2000/10/swap/string#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+{
+} => {
+  "0" log:outputString "hello log\n" .
+  "99999" log:outputString "end\n" .
+}.
+
+{
+  ?i rdfs:Class :Individual;
+     :NAME ?name .
+  ("Individual " [is log:uri of ?i] " is named " ?name "\n") 
+  string:concatenation ?s.
+} => {
+  "3" log:outputString ?s .
+}.
+
+{
+  ?i1 rdfs:Class :Individual;
+      :NAME ?name .
+  ?i2 rdfs:Class :Individual;
+      :NAME ?name ;
+      log:notEqualTo ?i1 .
+  ("these have the same name: " [ is log:uri of ?i1] " and " 
+   [is log:uri of ?i2] "\n") string:concatenation ?s.
+} => {
+  "1" log:outputString ?s .
+  ?i1 = ?i2 .
+}.
+
+{
+  ?i1 a :Individual;
+      :NAME ?n1 .
+  ?i2 a :Individual;
+      :NAME ?n2 .
+  [famtree:closeSpelling ?n1, ?n2] .
+} => {
+  ?i1 = ?i2 .
+}.
+
